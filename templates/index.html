@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Investment Categories Distribution</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h1>Investment Categories Distribution</h1>
+    <div id="charts"></div>
+
+    <script>
+        async function fetchData() {
+            const response = await fetch('/data');
+            const data = await response.json();
+            updateCharts(data);
+        }
+
+        function updateCharts(data) {
+            const chartsDiv = document.getElementById('charts');
+            chartsDiv.innerHTML = '';
+
+            for (const [accountName, categorySums] of Object.entries(data)) {
+                const categories = Object.keys(categorySums).filter(cat => categorySums[cat] > 0);
+                const values = categories.map(cat => categorySums[cat]);
+
+                const chartDiv = document.createElement('div');
+                chartDiv.id = `chart_${accountName}`;
+                chartsDiv.appendChild(chartDiv);
+
+                const data = [{
+                    values: values,
+                    labels: categories,
+                    type: 'pie'
+                }];
+
+                const layout = {
+                    title: `Investment Categories Distribution for Account: ${accountName}`
+                };
+
+                Plotly.newPlot(chartDiv.id, data, layout);
+            }
+        }
+
+        fetchData();
+    </script>
+</body>
+</html>

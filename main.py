@@ -1,13 +1,14 @@
+from flask import Flask, render_template, jsonify
 import pandas as pd
-import matplotlib.pyplot as plt
+
+app = Flask(__name__)
 
 
-def process_csv(file_path):
-    # Load the CSV file into a DataFrame and filter out rows with 'SPAXX**'
+def get_data():
+    file_path = 'Portfolio_Positions_Jan-03-2025.csv'
     df = pd.read_csv(file_path)
     df = df[df['Symbol'] != 'SPAXX**']
 
-    # Define investment categories with their symbols
     categories = {
         "foundational": ["FXAIX", "VOO", "SCHX", "FZROX", "FNILX", "FSPSX"],
         "growth": ["SCHG", "NVDA", "PLTR", "QQQM", "FDIS", "FTEC", "VUG", "FBTC", "IBIT"],
@@ -15,14 +16,10 @@ def process_csv(file_path):
         "bonds": ["SPLB", "VGSH"]
     }
 
-    # Filter out rows with NaN account names
     df = df.dropna(subset=['Account Name'])
-
-    # Initialize a dictionary to store total quantities for each category per account
     account_category_sums = {account: {category: 0 for category in categories} for account in
                              df['Account Name'].unique()}
 
-    # Sum quantities for each investment category per account
     for _, row in df.iterrows():
         if 'The data and information in this spreadsheet' in str(row):
             break
@@ -34,19 +31,19 @@ def process_csv(file_path):
             if symbol in symbols:
                 account_category_sums[account_name][category] += quantity
 
-    # Create a pie chart for each account
-    for account_name, category_sums in account_category_sums.items():
-        # Filter out categories with a total quantity of 0
-        total_quantities = {category: quantity for category, quantity in category_sums.items() if quantity > 0}
-        labels = list(total_quantities.keys())
-        sizes = list(total_quantities.values())
-
-        plt.figure(figsize=(10, 7))
-        plt.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=140)
-        plt.axis('equal')
-        plt.title(f'Investment Categories Distribution for Account: {account_name}')
-        plt.show()
+    return account_category_sums
 
 
-# Call the function with the CSV file path
-process_csv('Portfolio_Positions_Jan-03-2025.csv')
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+
+@app.route('/data')
+def data():
+    account_category_sums = get_data()
+    return jsonify(account_category_sums)
+
+
+if __name__ == '__main__':
+    app.run(debug=True)

@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home Page</title>
+    <title>{{ account_name }}</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <script src="{{ url_for('static', filename='home_scripts.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='scripts.js') }}" defer></script>
 </head>
 <body>
     <nav>
@@ -16,8 +17,9 @@
     </nav>
 
     <main>
-        <h1>Home Page</h1>
-        <div id="investment-tables"></div>
+        <h1 data-account-name="{{ account_name }}">Investment Categories Distribution for Account: {{ account_name }}</h1>
+        <div id="charts"></div>
+        <div id="tables"></div>
     </main>
 </body>
 </html>

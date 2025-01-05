@@ -2,11 +2,6 @@ body {
     font-family: Arial, sans-serif;
     margin: 0;
     padding: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
     background-color: #f4f4f4;
 }
 
@@ -15,6 +10,10 @@ nav {
     width: 100%;
     text-align: center;
     padding: 10px 0;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1000;
 }
 
 nav a {
@@ -30,14 +29,24 @@ nav a:hover {
     color: black;
 }
 
+main {
+    width: 90%;
+    max-width: 800px;
+    margin: 80px auto 20px auto; /* Adjusted margin to account for fixed nav */
+    padding: 20px;
+    text-align: center;
+    background-color: #fff;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+}
+
 h1, h2 {
     text-align: center;
     margin: 20px 0;
 }
 
-#charts, #tables {
-    width: 90%;
-    max-width: 800px;
+#investment-tables {
+    width: 100%;
     margin-top: 20px;
 }
 
@@ -56,6 +65,24 @@ h1, h2 {
 .investment-table th {
     background-color: #333;
     color: white;
+}
+
+.investment-table input {
+    width: 100%;
+    padding: 6px;
+    border: none;
+    background-color: transparent;
+    box-sizing: border-box;
+    outline: none;
+}
+
+.investment-table input:focus {
+    border: 1px solid #ccc;
+    background-color: white;
+}
+
+.investment-table .total-row {
+    background-color: #e0e0e0;
 }
 
 @media (max-width: 600px) {

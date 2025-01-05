@@ -5,45 +5,97 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Investment Categories Distribution</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-    <h1>Investment Categories Distribution</h1>
+    <nav>
+        {% for account in accounts %}
+            <a href="{{ url_for('account', account_name=account) }}">{{ account }}</a>
+        {% endfor %}
+    </nav>
+
+    <h1>Investment Categories Distribution for Account: {{ account_name }}</h1>
     <div id="charts"></div>
+    <div id="tables"></div>
 
     <script>
-        async function fetchData() {
-            const response = await fetch('/data');
+        async function fetchData(accountName) {
+            const response = await fetch(`/data/${accountName}`);
             const data = await response.json();
-            updateCharts(data);
+            updateCharts(accountName, data.chartData);
+            updateTables(data.tableData);
         }
 
-        function updateCharts(data) {
+        function updateCharts(accountName, data) {
             const chartsDiv = document.getElementById('charts');
             chartsDiv.innerHTML = '';
 
-            for (const [accountName, categorySums] of Object.entries(data)) {
-                const categories = Object.keys(categorySums).filter(cat => categorySums[cat] > 0);
-                const values = categories.map(cat => categorySums[cat]);
+            const categories = Object.keys(data).filter(cat => data[cat] > 0);
+            const values = categories.map(cat => data[cat]);
 
-                const chartDiv = document.createElement('div');
-                chartDiv.id = `chart_${accountName}`;
-                chartsDiv.appendChild(chartDiv);
+            const chartDiv = document.createElement('div');
+            chartsDiv.appendChild(chartDiv);
 
-                const data = [{
-                    values: values,
-                    labels: categories,
-                    type: 'pie'
-                }];
+            const chartData = [{
+                values: values,
+                labels: categories,
+                type: 'pie'
+            }];
 
-                const layout = {
-                    title: `Investment Categories Distribution for Account: ${accountName}`
-                };
-
-                Plotly.newPlot(chartDiv.id, data, layout);
-            }
+            const layout = { title: `Investment Categories Distribution for Account: ${accountName}` };
+            Plotly.newPlot(chartDiv, chartData, layout);
         }
 
-        fetchData();
+        function updateTables(data) {
+            const tablesDiv = document.getElementById('tables');
+            tablesDiv.innerHTML = '';
+
+            const categories = ['foundational', 'growth', 'dividend', 'bonds', 'Uncategorized'];
+            categories.forEach(category => {
+                const categoryData = data[category];
+                if (categoryData.length > 0) {
+                    const header = document.createElement('h2');
+                    header.textContent = capitalize(category);
+                    tablesDiv.appendChild(header);
+
+                    const table = createTable();
+                    categoryData.forEach(row => {
+                        const tr = document.createElement('tr');
+                        ['Symbol', 'Description', 'Quantity', 'Total Gain/Loss Dollar', 'Total Gain/Loss Percent'].forEach(field => {
+                            const td = document.createElement('td');
+                            td.textContent = row[field];
+                            if (field.includes('Total Gain/Loss')) {
+                                const value = parseFloat(row[field].replace(/[^0-9.-]+/g, ""));
+                                td.style.color = value < 0 ? 'red' : 'green';
+                            }
+                            tr.appendChild(td);
+                        });
+                        table.appendChild(tr);
+                    });
+                    tablesDiv.appendChild(table);
+                }
+            });
+        }
+
+        function createTable() {
+            const table = document.createElement('table');
+            table.className = 'investment-table';
+            const headerRow = document.createElement('tr');
+            const headers = ['Symbol', 'Description', 'Quantity', 'Total Gain/Loss Dollar', 'Total Gain/Loss Percent'];
+            headers.forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                headerRow.appendChild(th);
+            });
+            table.appendChild(headerRow);
+            return table;
+        }
+
+        function capitalize(str) {
+            return str.charAt(0).toUpperCase() + str.slice(1);
+        }
+
+        fetchData("{{ account_name }}");
     </script>
 </body>
 </html>

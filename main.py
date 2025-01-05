@@ -3,7 +3,6 @@ import pandas as pd
 
 app = Flask(__name__)
 
-
 def get_data():
     file_path = 'Portfolio_Positions_Jan-03-2025.csv'
     df = pd.read_csv(file_path)
@@ -17,33 +16,59 @@ def get_data():
     }
 
     df = df.dropna(subset=['Account Name'])
-    account_category_sums = {account: {category: 0 for category in categories} for account in
-                             df['Account Name'].unique()}
+    account_category_sums = {account: {category: 0 for category in categories} for account in df['Account Name'].unique()}
+    account_table_data = {account: {category: [] for category in categories} for account in df['Account Name'].unique()}
+
+    for account in account_table_data:
+        account_table_data[account]['Uncategorized'] = []
 
     for _, row in df.iterrows():
-        if 'The data and information in this spreadsheet' in str(row):
-            break
         account_name = row['Account Name']
-        symbol = row['Symbol']
-        quantity = row['Quantity']
+        symbol, description, quantity = row['Symbol'], row['Description'], row['Quantity']
+        total_gain_loss_dollar, total_gain_loss_percent = row['Total Gain/Loss Dollar'], row['Total Gain/Loss Percent']
 
+        categorized = False
         for category, symbols in categories.items():
             if symbol in symbols:
+                account_table_data[account_name][category].append({
+                    'Symbol': symbol,
+                    'Description': description,
+                    'Quantity': quantity,
+                    'Total Gain/Loss Dollar': total_gain_loss_dollar,
+                    'Total Gain/Loss Percent': total_gain_loss_percent
+                })
                 account_category_sums[account_name][category] += quantity
+                categorized = True
+                break
 
-    return account_category_sums
+        if not categorized:
+            account_table_data[account_name]['Uncategorized'].append({
+                'Symbol': symbol,
+                'Description': description,
+                'Quantity': quantity,
+                'Total Gain/Loss Dollar': total_gain_loss_dollar,
+                'Total Gain/Loss Percent': total_gain_loss_percent
+            })
 
+    return account_category_sums, account_table_data
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    accounts, _ = get_data()
+    return render_template('index.html', accounts=accounts.keys(), account_name=list(accounts.keys())[0])
 
+@app.route('/account/<account_name>')
+def account(account_name):
+    accounts, _ = get_data()
+    return render_template('index.html', accounts=accounts.keys(), account_name=account_name)
 
-@app.route('/data')
-def data():
-    account_category_sums = get_data()
-    return jsonify(account_category_sums)
-
+@app.route('/data/<account_name>')
+def data(account_name):
+    account_category_sums, account_table_data = get_data()
+    return jsonify({
+        'chartData': account_category_sums.get(account_name, {}),
+        'tableData': account_table_data.get(account_name, {})
+    })
 
 if __name__ == '__main__':
     app.run(debug=True)

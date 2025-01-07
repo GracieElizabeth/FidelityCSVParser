@@ -43,3 +43,38 @@ async function saveWeeklyDeposit(accountName, value) {
 }
 
 document.addEventListener('DOMContentLoaded', fetchInvestmentData);
+
+document.getElementById('fileUpload').addEventListener('change', function () {
+    let fileName = this.files[0] ? this.files[0].name : 'No file chosen';
+    document.getElementById('fileName').textContent = 'Selected file: ' + fileName;
+});
+
+document.getElementById('uploadForm').addEventListener('submit', function (e) {
+    e.preventDefault(); // Prevent default form submission
+
+    let fileInput = document.getElementById('fileUpload');
+    let file = fileInput.files[0];
+
+    if (file && file.type === 'text/csv') {
+        let formData = new FormData();
+        formData.append('fileUpload', file);
+
+        fetch('/upload_csv', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('File uploaded successfully!');
+            } else {
+                alert('Error uploading file.');
+            }
+        })
+        .catch(err => {
+            alert('Error: ' + err.message);
+        });
+    } else {
+        alert('Please upload a valid CSV file.');
+    }
+});

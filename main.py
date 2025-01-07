@@ -3,8 +3,19 @@ import pandas as pd
 import json
 import os
 from datetime import datetime
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
+
+# Set upload folder and allowed extensions for file upload
+UPLOAD_FOLDER = 'csvs'
+ALLOWED_EXTENSIONS = {'csv'}
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# Function to check allowed file extensions
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 class DataLoader:
     def __init__(self, folder_path='csvs'):
@@ -231,6 +242,39 @@ def delete_budget_route():
             del budget[category]
         budget_manager.save_budget(budget)
     return '', 204
+
+# Add the route to handle CSV file upload
+@app.route('/upload_csv', methods=['POST'])
+def upload_csv():
+    # Check if the post request has the file part
+    if 'fileUpload' not in request.files:
+        return jsonify({'success': False, 'message': 'No file part'}), 400
+    file = request.files['fileUpload']
+    
+    # If no file is selected
+    if file.filename == '':
+        return jsonify({'success': False, 'message': 'No selected file'}), 400
+    
+    # Check if the file is a CSV
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+        # Print the absolute path to debug where it's being saved
+        print(f"File path: {os.path.abspath(filepath)}")  # Debugging output
+
+        print(f"File path: {filepath}")  # Debugging output
+        
+        # Create the csvs folder if it doesn't exist
+        if not os.path.exists(app.config['UPLOAD_FOLDER']):
+            os.makedirs(app.config['UPLOAD_FOLDER'])
+            print(f"Created folder: {app.config['UPLOAD_FOLDER']}")  # Debugging output
+        
+        file.save(filepath)
+        print(f"File saved: {filename}")  # Debugging output
+        return jsonify({'success': True, 'message': 'File uploaded successfully!'}), 200
+    else:
+        return jsonify({'success': False, 'message': 'Invalid file format. Only CSV files are allowed.'}), 400
 
 if __name__ == '__main__':
     app.run(debug=True)

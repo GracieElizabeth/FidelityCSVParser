@@ -1,1 +1,10 @@
+.idea/*
+.gitignore
+
+# Fidelity Info
 csvs/*
+
+# jsons
+budget.json
+recurring_investments.json
+weekly_deposits.json

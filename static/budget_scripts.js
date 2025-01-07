@@ -6,13 +6,18 @@ async function fetchBudgetData() {
         const response = await fetch('/budget_data');
         if (!response.ok) throw new Error('Network response was not ok');
         const data = await response.json();
-        updateBudgetTables(data);
-        updateCategoryDropdown(data);
-        updateCategoryTotalsTable(data);
+        updateBudgetUI(data);
         return data;
     } catch (error) {
         console.error('Fetch error:', error);
     }
+}
+
+function updateBudgetUI(data) {
+    updateBudgetTables(data);
+    updateCategoryDropdown(data);
+    updateCategoryTotalsTable(data);
+    updateBudgetSummary(data);
 }
 
 function updateBudgetTables(data) {
@@ -20,53 +25,83 @@ function updateBudgetTables(data) {
     tablesDiv.innerHTML = '';
 
     Object.keys(data).forEach(category => {
-        const categoryContainer = document.createElement('div');
-        categoryContainer.className = 'category-container';
-
-        const categoryHeader = document.createElement('h2');
-        categoryHeader.textContent = category;
-        categoryContainer.appendChild(categoryHeader);
-
-        const table = document.createElement('table');
-        table.className = 'budget-table';
-
-        const headers = ['Description', 'Amount', 'Frequency', 'Necessary', 'Actions'];
-        const headerRow = document.createElement('tr');
-        headers.forEach(header => {
-            const th = document.createElement('th');
-            th.textContent = header;
-            headerRow.appendChild(th);
-        });
-        table.appendChild(headerRow);
-
-        const fragment = document.createDocumentFragment();
-        data[category].forEach((item, index) => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${item.description}</td>
-                <td>$${item.amount.toFixed(2)}</td>
-                <td>${item.frequency.split(' ')[0]} ${item.frequency.split(' ')[1]}${item.frequency.split(' ')[0] > 1 ? 's' : ''}</td>
-                <td>${item.necessary ? 'Yes' : 'No'}</td>
-                <td class="button-container">
-                    <button onclick="editPayment('${category}', ${index})">Edit</button>
-                    <button onclick="deletePayment('${category}', ${index})">Delete</button>
-                </td>
-            `;
-            fragment.appendChild(row);
-        });
-
-        table.appendChild(fragment);
-        categoryContainer.appendChild(table);
+        const categoryContainer = createCategoryContainer(category, data[category]);
         tablesDiv.appendChild(categoryContainer);
     });
+}
 
-    updateBudgetSummary(data);
+function createCategoryContainer(category, items) {
+    const categoryContainer = document.createElement('div');
+    categoryContainer.className = 'category-container';
+
+    const categoryHeader = document.createElement('h2');
+    categoryHeader.textContent = category;
+    categoryContainer.appendChild(categoryHeader);
+
+    const table = createCategoryTable(items, category);
+    categoryContainer.appendChild(table);
+    
+    return categoryContainer;
+}
+
+function createCategoryTable(items, category) {
+    const table = document.createElement('table');
+    table.className = 'budget-table';
+    table.appendChild(createTableHeader());
+
+    const fragment = document.createDocumentFragment();
+    items.forEach((item, index) => {
+        const row = createBudgetTableRow(item, category, index);
+        fragment.appendChild(row);
+    });
+    table.appendChild(fragment);
+
+    return table;
+}
+
+function createTableHeader() {
+    const headers = ['Description', 'Amount', 'Frequency', 'Necessary', 'Actions'];
+    const headerRow = document.createElement('tr');
+    headers.forEach(header => {
+        const th = document.createElement('th');
+        th.textContent = header;
+        headerRow.appendChild(th);
+    });
+    return headerRow;
+}
+
+function createBudgetTableRow(item, category, index) {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+        <td>${item.description}</td>
+        <td>$${item.amount.toFixed(2)}</td>
+        <td>${formatFrequency(item.frequency)}</td>
+        <td>${item.necessary ? 'Yes' : 'No'}</td>
+        <td class="button-container">
+            <button onclick="editPayment('${category}', ${index})">Edit</button>
+            <button onclick="deletePayment('${category}', ${index})">Delete</button>
+        </td>
+    `;
+    return row;
+}
+
+function formatFrequency(frequency) {
+    const [frequencyNumber, frequencyUnit] = frequency.split(' ');
+    return `${frequencyNumber} ${frequencyUnit}${frequencyNumber > 1 ? 's' : ''}`;
 }
 
 function updateCategoryTotalsTable(data) {
     const totalsTableBody = document.getElementById('category-totals-table').querySelector('tbody');
     totalsTableBody.innerHTML = '';
 
+    const categoryTotals = calculateCategoryTotals(data);
+    Object.keys(categoryTotals).forEach(category => {
+        const row = createCategoryTotalsRow(category, categoryTotals[category]);
+        totalsTableBody.appendChild(row);
+    });
+}
+
+function calculateCategoryTotals(data) {
     const categoryTotals = {};
 
     Object.keys(data).forEach(category => {
@@ -74,22 +109,9 @@ function updateCategoryTotalsTable(data) {
         let weeklyTotal = 0;
 
         data[category].forEach(item => {
-            const [frequencyNumber, frequencyUnit] = item.frequency.split(' ');
-            const amount = item.amount;
-
-            let monthlyAmount;
-            if (frequencyUnit.includes('week')) {
-                monthlyAmount = (amount * frequencyNumber * 52) / 12;
-            } else if (frequencyUnit.includes('month')) {
-                monthlyAmount = amount * frequencyNumber;
-            } else if (frequencyUnit.includes('year')) {
-                monthlyAmount = (amount * frequencyNumber) / 12;
-            } else {
-                monthlyAmount = amount;
-            }
-
+            const monthlyAmount = calculateMonthlyAmount(item);
             monthlyTotal += monthlyAmount;
-            weeklyTotal += monthlyAmount / 4.33;
+            weeklyTotal += monthlyAmount / 4.33; 
         });
 
         categoryTotals[category] = {
@@ -99,72 +121,103 @@ function updateCategoryTotalsTable(data) {
         };
     });
 
-    Object.keys(categoryTotals).forEach(category => {
-        const row = document.createElement('tr');
-        row.setAttribute('data-category', category);
-        row.innerHTML = `
-            <td>${category}</td>
-            <td>$${categoryTotals[category].monthly.toFixed(2)}</td>
-            <td>$${categoryTotals[category].weekly.toFixed(2)}</td>
-            <td>${categoryTotals[category].necessary ? 'Yes' : 'No'}</td>
-        `;
-        row.addEventListener('click', () => toggleCategoryDetails(category, data[category]));
-        totalsTableBody.appendChild(row);
-    });
+    return categoryTotals;
 }
 
-function toggleCategoryDetails(category, items) {
+function calculateMonthlyAmount(item) {
+    const [frequencyNumber, frequencyUnit] = item.frequency.split(' ');
+    const amount = item.amount;
+
+    switch (frequencyUnit) {
+        case 'week':
+        case 'weeks':
+            return (amount * frequencyNumber) * 4.33;
+        case 'month':
+        case 'months':
+            return amount / frequencyNumber;
+        case 'year':
+        case 'years':
+            return amount / (frequencyNumber * 12);
+        default:
+            return amount / frequencyNumber;
+    }
+}
+
+function createCategoryTotalsRow(category, totals) {
+    const row = document.createElement('tr');
+    row.setAttribute('data-category', category);
+    row.innerHTML = `
+        <td>${category}</td>
+        <td>$${totals.monthly.toFixed(2)}</td>
+        <td>$${totals.weekly.toFixed(2)}</td>
+    `;
+    row.addEventListener('click', () => toggleCategoryDetails(category));
+    return row;
+}
+
+function toggleCategoryDetails(category) {
     const existingDetails = document.querySelectorAll(`.details[data-category="${category}"]`);
+    
     if (existingDetails.length > 0) {
         existingDetails.forEach(detail => detail.remove());
-        return;
+    } else {
+        const data = fetchBudgetData(); 
+        data.then(items => {
+            items[category].forEach(item => {
+                const detailsRow = createCategoryDetailsRow(category, item);
+                const categoryRow = document.querySelector(`tr[data-category="${category}"]`);
+                categoryRow.insertAdjacentElement('afterend', detailsRow);
+            });
+        });
     }
+}
 
-    items.forEach(item => {
-        const detailsRow = document.createElement('tr');
-        detailsRow.className = 'details';
-        detailsRow.setAttribute('data-category', category);
-        detailsRow.style.backgroundColor = '#f0f0f0';
-
-        detailsRow.innerHTML = `
-            <td>${item.description}</td>
-            <td>$${item.amount.toFixed(2)}</td>
-            <td>${item.frequency.split(' ')[0]} ${item.frequency.split(' ')[1]}${item.frequency.split(' ')[0] > 1 ? 's' : ''}</td>
-            <td>${item.necessary ? 'Yes' : 'No'}</td>
-        `;
-
-        const categoryRow = document.querySelector(`tr[data-category="${category}"]`);
-        categoryRow.insertAdjacentElement('afterend', detailsRow);
-    });
+function createCategoryDetailsRow(category, item) {
+    const row = document.createElement('tr');
+    row.className = 'details';
+    row.setAttribute('data-category', category);
+    row.style.backgroundColor = '#f0f0f0';
+    row.innerHTML = `
+        <td>${item.description}</td>
+        <td>$${item.amount.toFixed(2)}</td>
+        <td>${formatFrequency(item.frequency)}</td>
+    `;
+    return row;
 }
 
 function updateBudgetSummary(data) {
     const summaryDiv = document.getElementById('budget-summary');
     summaryDiv.innerHTML = '';
 
+    const { totalMonthlyPayments, totalMonthlySpending } = calculateTotals(data);
+    const totalWeeklyPayments = totalMonthlyPayments / 4.33;
+    const totalWeeklySpending = totalMonthlySpending / 4.33;
+
+    const weeklyIncome = 735.08;
+    const monthlyIncome = weeklyIncome * 4.33;
+
+    summaryDiv.innerHTML = `
+        <p>Monthly Income After Tax: $${monthlyIncome.toFixed(2)}</p>
+        <p>Weekly Income After Tax: $${weeklyIncome}</p>
+        <br>
+        <p>Necessary Monthly Payments: $${totalMonthlyPayments.toFixed(2)}</p>
+        <p>Necessary Weekly Payments: $${totalWeeklyPayments.toFixed(2)}</p>
+        <p>Total Monthly Spending: $${totalMonthlySpending.toFixed(2)}</p>
+        <p>Total Weekly Spending: $${totalWeeklySpending.toFixed(2)}</p>
+    `;
+}
+
+function calculateTotals(data) {
     let totalMonthlyPayments = 0;
     let totalMonthlySpending = 0;
 
     Object.values(data).flat().forEach(item => {
-        const [frequencyNumber, frequencyUnit] = item.frequency.split(' ');
-        const amount = item.amount;
-
-        const monthlyAmount = frequencyUnit.includes('week') ? (amount / 7) * 30 * frequencyNumber :
-                              frequencyUnit.includes('month') ? amount * frequencyNumber :
-                              (amount / 12) * frequencyNumber;
-
+        const monthlyAmount = calculateMonthlyAmount(item);
         totalMonthlySpending += monthlyAmount;
         if (item.necessary) totalMonthlyPayments += monthlyAmount;
     });
 
-    const totalWeeklyPayments = totalMonthlyPayments / 4.33;
-    const totalWeeklySpending = totalMonthlySpending / 4.33;
-
-    summaryDiv.innerHTML = `
-        <p>Necessary Monthly Payments: $${totalMonthlyPayments.toFixed(2)}</p>
-        <p>Necessary Weekly Payments: $${totalWeeklyPayments.toFixed(2)}</p>
-        <p>Total Weekly Spending: $${totalWeeklySpending.toFixed(2)}</p>
-    `;
+    return { totalMonthlyPayments, totalMonthlySpending };
 }
 
 function updateCategoryDropdown(data) {
@@ -178,58 +231,42 @@ function updateCategoryDropdown(data) {
 
 async function addPayment(event) {
     event.preventDefault();
-
-    let category = document.getElementById('category').value;
-    if (category === 'new') {
-        category = document.getElementById('new-category').value;
-    }
-    const description = document.getElementById('description').value;
-    const amount = parseFloat(document.getElementById('amount').value);
-    const frequencyNumber = parseInt(document.getElementById('frequency-number').value);
-    const frequencyUnit = document.getElementById('frequency-unit').value;
-    const frequency = `${frequencyNumber} ${frequencyUnit}`;
-    const necessary = document.getElementById('necessary').checked;
-
-    const response = await fetch('/save_budget', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ category, description, amount, frequency, necessary }),
-    });
-
+    const paymentData = gatherPaymentFormData();
+    const response = await sendPaymentRequest('/save_budget', paymentData);
     if (response.ok) {
-        fetchBudgetData();
-        resetForm();
+        fetchBudgetData(); // Reload budget data to update the UI
+        resetForm(); // Reset the form
     }
-}
-
-async function editPayment(category, index) {
-    const data = await fetchBudgetData();
-    const item = data[category][index];
-
-    document.getElementById('category').value = category;
-    document.getElementById('description').value = item.description;
-    document.getElementById('amount').value = item.amount;
-    const [frequencyNumber, frequencyUnit] = item.frequency.split(' ');
-    document.getElementById('frequency-number').value = frequencyNumber;
-    document.getElementById('frequency-unit').value = frequencyUnit;
-    document.getElementById('necessary').checked = item.necessary;
-
-    currentEditCategory = category;
-    currentEditIndex = index;
-
-    document.getElementById('add-payment-form').removeEventListener('submit', addPayment);
-    document.getElementById('add-payment-form').addEventListener('submit', updatePayment);
 }
 
 async function updatePayment(event) {
     event.preventDefault();
+    const paymentData = gatherPaymentFormData();
+    paymentData.currentEditCategory = currentEditCategory;
+    paymentData.currentEditIndex = currentEditIndex;
 
-    let category = document.getElementById('category').value;
-    if (category === 'new') {
-        category = document.getElementById('new-category').value;
+    const response = await sendPaymentRequest('/update_budget', paymentData);
+    if (response.ok) {
+        fetchBudgetData(); // Reload budget data to update the UI
+        resetForm(); // Reset the form
     }
+}
+
+async function sendPaymentRequest(url, paymentData) {
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(paymentData),
+    });
+    return response;
+}
+
+function gatherPaymentFormData() {
+    const category = document.getElementById('category').value === 'new'
+        ? document.getElementById('new-category').value
+        : document.getElementById('category').value;
     const description = document.getElementById('description').value;
     const amount = parseFloat(document.getElementById('amount').value);
     const frequencyNumber = parseInt(document.getElementById('frequency-number').value);
@@ -237,18 +274,7 @@ async function updatePayment(event) {
     const frequency = `${frequencyNumber} ${frequencyUnit}`;
     const necessary = document.getElementById('necessary').checked;
 
-    const response = await fetch('/update_budget', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ category, description, amount, frequency, necessary, currentEditCategory, currentEditIndex }),
-    });
-
-    if (response.ok) {
-        fetchBudgetData();
-        resetForm();
-    }
+    return { category, description, amount, frequency, necessary };
 }
 
 async function deletePayment(category, index) {
@@ -259,35 +285,42 @@ async function deletePayment(category, index) {
         },
         body: JSON.stringify({ category, index }),
     });
-
     if (response.ok) {
-        fetchBudgetData();
+        fetchBudgetData(); // Reload budget data to update the UI
     }
 }
 
 function resetForm() {
-    document.getElementById('category').value = '';
-    document.getElementById('new-category').value = '';
+    document.getElementById('add-payment-form').reset();
     document.getElementById('new-category').style.display = 'none';
-    document.getElementById('description').value = '';
-    document.getElementById('amount').value = '';
-    document.getElementById('frequency-number').value = '';
-    document.getElementById('frequency-unit').value = 'week';
-    document.getElementById('necessary').checked = false;
-
     document.getElementById('add-payment-form').removeEventListener('submit', updatePayment);
     document.getElementById('add-payment-form').addEventListener('submit', addPayment);
-
-    currentEditCategory = null;
-    currentEditIndex = null;
 }
 
-document.getElementById('category').addEventListener('change', function() {
-    const newCategoryInput = document.getElementById('new-category');
-    if (this.value === 'new') {
-        newCategoryInput.style.display = 'block';
+function editPayment(category, index) {
+    currentEditCategory = category;
+    currentEditIndex = index;
+
+    const data = fetchBudgetData(); 
+    data.then(items => {
+        const item = items[category][index];
+        document.getElementById('description').value = item.description;
+        document.getElementById('amount').value = item.amount;
+        document.getElementById('category').value = category;
+        document.getElementById('frequency-number').value = item.frequency.split(' ')[0];
+        document.getElementById('frequency-unit').value = item.frequency.split(' ')[1];
+        document.getElementById('necessary').checked = item.necessary;
+    });
+
+    document.getElementById('add-payment-form').removeEventListener('submit', addPayment);
+    document.getElementById('add-payment-form').addEventListener('submit', updatePayment);
+}
+
+document.getElementById('category').addEventListener('change', (e) => {
+    if (e.target.value === 'new') {
+        document.getElementById('new-category').style.display = 'block';
     } else {
-        newCategoryInput.style.display = 'none';
+        document.getElementById('new-category').style.display = 'none';
     }
 });
 

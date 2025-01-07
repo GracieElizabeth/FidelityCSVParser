@@ -111,7 +111,7 @@ function updateTables(accountName, data, recurringInvestments) {
             totalRow.appendChild(totalGainLossDollarTd);
 
             const totalGainLossPercentTd = document.createElement('td');
-            totalGainLossPercentTd.textContent = (totalGainLossPercent / categoryData.length).toFixed(2);
+            totalGainLossPercentTd.textContent = (totalGainLossPercent / categoryData.length).toFixed(2) + '%';
             totalGainLossPercentTd.style.color = totalGainLossPercent < 0 ? 'red' : 'green';
             totalRow.appendChild(totalGainLossPercentTd);
 

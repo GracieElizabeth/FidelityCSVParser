@@ -19,12 +19,13 @@
 
     <main>
         <h1>Home Page</h1>
-        <h1>Upload Your File</h1>
-        <form id="uploadForm">
-            <input type="file" id="fileUpload" name="fileUpload" accept=".csv" required>
-            <input type="submit" value="Upload">
-            <div id="fileName">No file chosen</div>
+        <h1>Upload CSV File</h1>
+        <form id="uploadForm" class="button-container">
+            <input type="file" id="fileUpload" class="file-upload" name="fileUpload">
+            <label for="fileUpload" class="custom-button"> Choose File </label>
+        <input type="submit" value="Upload" class="custom-button">
         </form>
+        <p id="fileName"></p>
         <div id="investment-tables"></div>
     </main>
 </body>

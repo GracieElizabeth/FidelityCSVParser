@@ -23,13 +23,24 @@ class DataLoader:
 
     def get_data(self):
         files = [f for f in os.listdir(self.folder_path) if f.endswith('.csv')]
+        print(f"Files in the folder: {files}")  # Debugging output
+        
         dates = [(datetime.strptime(f.split('_')[-1].split('.')[0], '%b-%d-%Y'), f) for f in files if '_' in f and f.split('_')[-1].split('.')[0]]
+        
         if not dates:
+            print("No valid CSV files found in the folder.")  # Debugging output
             raise FileNotFoundError("No valid CSV files found in the folder.")
+        
         latest_file = max(dates, key=lambda x: x[0])[1]
-        df = pd.read_csv(os.path.join(self.folder_path, latest_file))
-        df = df[df['Symbol'] != 'SPAXX**']
+        print(f"Most recent file selected: {latest_file}")  # Debugging output
 
+        df = pd.read_csv(os.path.join(self.folder_path, latest_file))
+        df = df[df['Symbol'] != 'SPAXX**']  # Skip rows with "SPAXX**"
+        
+        # Skip rows with "Pending Activity" in the description or rows with empty or invalid quantities
+        df = df[~df['Symbol'].str.contains('Pending Activity', case=False, na=False)]  # Skip rows with Pending Activity as symbol
+        df = df[df['Quantity'].notna() & (df['Quantity'] != '')]  # Skip rows with empty or NaN quantities
+        
         categories = {
             "foundational": ["FXAIX", "VOO", "SCHX", "FZROX", "FNILX", "FSPSX", "WMT", "XLC", "VEA", "XLF", "XLI", "XLE", "FZILX", "CCI", "FREL"],
             "growth": ["SCHG", "NVDA", "PLTR", "QQQM", "FDIS", "FTEC", "VUG", "FBTC", "IBIT", "KRC", "FITLX"],
@@ -41,9 +52,22 @@ class DataLoader:
         account_category_sums = {account: {category: 0 for category in categories} for account in df['Account Name'].unique()}
         account_table_data = {account: {category: [] for category in categories} for account in df['Account Name'].unique()}
 
+        # Ensure 'Uncategorized' key is initialized in account_table_data
+        for account in account_table_data:
+            account_table_data[account]['Uncategorized'] = []
+
         for _, row in df.iterrows():
             account_name, symbol, description, quantity = row['Account Name'], row['Symbol'], row['Description'], row['Quantity']
             total_gain_loss_dollar, total_gain_loss_percent = row['Total Gain/Loss Dollar'], row['Total Gain/Loss Percent']
+            
+            # Skip the row if symbol is "SPAXX**" or if symbol is "Pending Activity"
+            if symbol == 'SPAXX**' or symbol == 'Pending Activity':
+                continue
+            
+            # Skip rows with invalid or missing quantities
+            if not quantity or pd.isna(quantity):
+                continue
+            
             categorized = False
             for category, symbols in categories.items():
                 if symbol in symbols:
@@ -67,6 +91,7 @@ class DataLoader:
                 })
 
         return account_category_sums, account_table_data
+
 
 class InvestmentManager:
     def __init__(self, rec_invest_file='recurring_investments.json', weekly_deposits_file='weekly_deposits.json'):
